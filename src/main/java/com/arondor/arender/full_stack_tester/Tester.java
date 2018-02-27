@@ -1,5 +1,8 @@
 package com.arondor.arender.full_stack_tester;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.awt.image.PixelGrabber;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -10,6 +13,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,6 +21,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.imageio.ImageIO;
 
 import org.apache.commons.io.IOUtils;
 
@@ -41,6 +47,8 @@ public class Tester
     private static ScheduledThreadPoolExecutor documentPoolExecutor = new ScheduledThreadPoolExecutor(
             Runtime.getRuntime().availableProcessors());
 
+    private static boolean dumpImages = false;
+
     public static void main(String[] args) throws IOException, InterruptedException
     {
         // expected : parameter 1 => base context of ARender
@@ -61,6 +69,11 @@ public class Tester
             // subfolders
             file = createTmpFile(file);
         }
+        if (args.length > 2)
+        {
+            dumpImages = Boolean.parseBoolean(args[2]);
+        }
+
         List<String> openExternalParams = new ArrayList<String>();
         BufferedReader bis = new BufferedReader(new FileReader(file));
         String parameters;
@@ -189,10 +202,54 @@ public class Tester
                     String URLimageSerlvet = baseURLARender + "arendergwt/imageServlet?uuid=" + docId + "&pagePosition="
                             + pageNumber + "&desc=IM_" + width + "_0";
                     logger.info("Calling : " + URLimageSerlvet);
-                    HttpURLConnection openConnection = (HttpURLConnection) new URL(URLimageSerlvet).openConnection();
+                    final HttpURLConnection openConnection = (HttpURLConnection) new URL(URLimageSerlvet)
+                            .openConnection();
                     if (openConnection.getResponseCode() == 200)
                     {
-                        IOUtils.readFully(openConnection.getInputStream(), (int) Long.MAX_VALUE);
+                        if (dumpImages)
+                        {
+                            String imageFolder = "./images/";
+                            if (!Files.exists(Paths.get(imageFolder)))
+                            {
+                                Files.createDirectory(Paths.get(imageFolder));
+                            }
+                            BufferedImage img = ImageIO.read(new URL(URLimageSerlvet));
+                            // img = img.getScaledInstance(100, -1,
+                            // Image.SCALE_FAST);
+                            int w = img.getWidth(null);
+                            int h = img.getHeight(null);
+                            int[] pixels = new int[w * h];
+                            PixelGrabber pg = new PixelGrabber(img, 0, 0, w, h, pixels, 0, w);
+                            try
+                            {
+                                pg.grabPixels();
+                                long totalPix = 0;
+                                long whitePix = 0;
+                                for (int pixel : pixels)
+                                {
+                                    Color color = new Color(pixel);
+                                    if (color.getRGB() == Color.WHITE.getRGB())
+                                    {
+                                        whitePix++;
+                                    }
+                                    totalPix++;
+                                }
+                                if (whitePix == totalPix)
+                                {
+                                    ImageIO.write(img, "png",
+                                            new File(imageFolder + docId + "-" + pageNumber + ".png"));
+                                }
+                            }
+                            catch (InterruptedException e)
+                            {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }
+                        }
+                        else
+                        {
+                            IOUtils.readFully(openConnection.getInputStream(), (int) Long.MAX_VALUE);
+                        }
                     }
                     else
                     {
