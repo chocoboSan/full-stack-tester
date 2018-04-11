@@ -24,6 +24,12 @@ import java.util.logging.Logger;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.IOUtils;
 
 import com.google.gson.Gson;
@@ -36,7 +42,16 @@ import com.google.gson.JsonObject;
  */
 public class Tester
 {
+
     private static final Logger logger = Logger.getLogger(Tester.class.getName());
+
+    private static final String URL_PARAM = "url";
+
+    private static final String FOLDER_PATH_PARAM = "folder";
+
+    private static final String DUMP_IMAGES_PARAM = "dump";
+
+    private static final String FULL_RUN_PARAM = "full";
 
     private static ScheduledThreadPoolExecutor imagePoolExecutor = new ScheduledThreadPoolExecutor(
             Runtime.getRuntime().availableProcessors() * 10);
@@ -49,31 +64,50 @@ public class Tester
 
     private static boolean dumpImages = false;
 
+    private static boolean fullRun = false;
+
     public static void main(String[] args) throws IOException, InterruptedException
     {
+        DefaultParser parser = new DefaultParser();
+        Options options = generateOptions();
+
+        CommandLine parse;
+        try
+        {
+            parse = parser.parse(options, args);
+        }
+        catch (ParseException e1)
+        {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("java -jar full-stack-tester-{VERSION}-jar-with-dependencies.jar", options, true);
+            return;
+        }
         // expected : parameter 1 => base context of ARender
         // parameter 2 => filename containing IDs to be played onto
         // openExternalDocument.jsp of
         // ARender
-        String baseURLARender = args[0];
+        String baseURLARender = parse.getOptionValue(URL_PARAM);
         if (!baseURLARender.endsWith("/"))
         {
             baseURLARender = baseURLARender + "/";
         }
         final String urlARenderFinal = baseURLARender;
 
-        File file = new File(args[1]);
+        File file = new File(parse.getOptionValue(FOLDER_PATH_PARAM));
         if (file.isDirectory())
         {
             // create and open tmp file containing all files of this folder and
             // subfolders
             file = createTmpFile(file);
         }
-        if (args.length > 2)
+        if (parse.hasOption(DUMP_IMAGES_PARAM))
         {
-            dumpImages = Boolean.parseBoolean(args[2]);
+            dumpImages = true;
         }
-
+        if (parse.hasOption(FULL_RUN_PARAM))
+        {
+            fullRun = true;
+        }
         List<String> openExternalParams = new ArrayList<String>();
         BufferedReader bis = new BufferedReader(new FileReader(file));
         String parameters;
@@ -112,10 +146,52 @@ public class Tester
                 }
             });
         }
+
         documentPoolExecutor.shutdown();
         documentPoolExecutor.awaitTermination(120, TimeUnit.MINUTES);
         imagePoolExecutor.shutdown();
         imagePoolExecutor.awaitTermination(120, TimeUnit.MINUTES);
+
+        if (fullRun)
+        {
+
+            while (documentPoolExecutor.getActiveCount() > 0)
+            {
+                logger.log(Level.SEVERE, "Running full mode, still have tasks to do :\n" + "documents: "
+                        + documentPoolExecutor.getActiveCount() + "\nimages : " + imagePoolExecutor.getActiveCount());
+                if (documentPoolExecutor.getActiveCount() > 0)
+                {
+                    documentPoolExecutor.awaitTermination(120, TimeUnit.MINUTES);
+                }
+                else if (imagePoolExecutor.getActiveCount() > 0)
+                {
+                    imagePoolExecutor.awaitTermination(120, TimeUnit.MINUTES);
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private static Options generateOptions()
+    {
+        Option baseUrl = new Option(URL_PARAM, true, "base url of deployed ARender");
+        baseUrl.setRequired(true);
+        Option folderName = new Option(FOLDER_PATH_PARAM, true, "path containing all documents to test in ARender");
+        folderName.setRequired(true);
+        Option dumpWhiteImages = new Option(DUMP_IMAGES_PARAM, false, "Dump all white images into a specific folder");
+        dumpWhiteImages.setRequired(false);
+        Option fullRun = new Option(FULL_RUN_PARAM, false, "Asks for a full run instead of 2mn load");
+        fullRun.setRequired(false);
+
+        Options options = new Options();
+        options.addOption(baseUrl);
+        options.addOption(folderName);
+        options.addOption(dumpWhiteImages);
+        options.addOption(fullRun);
+        return options;
     }
 
     private static File createTmpFile(File file) throws IOException
