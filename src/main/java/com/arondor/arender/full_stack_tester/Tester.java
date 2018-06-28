@@ -49,6 +49,8 @@ public class Tester
 
     private static final String FOLDER_PATH_PARAM = "folder";
 
+    private static final String FILE_LIST_PATH_PARAM = "filelist";
+
     private static final String DUMP_IMAGES_PARAM = "dump";
 
     private static final String FULL_RUN_PARAM = "full";
@@ -99,6 +101,11 @@ public class Tester
             // create and open tmp file containing all files of this folder and
             // subfolders
             file = createTmpFile(file);
+        }
+        file = new File(parse.getOptionValue(FILE_LIST_PATH_PARAM));
+        if (file.isFile())
+        {
+            // no-op, list is provided
         }
         if (parse.hasOption(DUMP_IMAGES_PARAM))
         {
