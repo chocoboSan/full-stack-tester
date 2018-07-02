@@ -1,3 +1,4 @@
+
 package com.arondor.arender.full_stack_tester;
 
 import java.awt.Color;
@@ -94,18 +95,33 @@ public class Tester
             baseURLARender = baseURLARender + "/";
         }
         final String urlARenderFinal = baseURLARender;
-
-        File file = new File(parse.getOptionValue(FOLDER_PATH_PARAM));
-        if (file.isDirectory())
+        File file = null;
+        String optionValue = parse.getOptionValue(FOLDER_PATH_PARAM);
+        if (optionValue != null)
         {
-            // create and open tmp file containing all files of this folder and
-            // subfolders
-            file = createTmpFile(file);
+            file = new File(optionValue);
+            if (file.isDirectory())
+            {
+                // create and open tmp file containing all files of this folder
+                // and
+                // subfolders
+                file = createTmpFile(file);
+            }
         }
-        file = new File(parse.getOptionValue(FILE_LIST_PATH_PARAM));
-        if (file.isFile())
+        String optionValue2 = parse.getOptionValue(FILE_LIST_PATH_PARAM);
+        if (optionValue2 != null)
         {
-            // no-op, list is provided
+            file = new File(optionValue2);
+            if (file.isFile())
+            {
+                // no-op, list is provided
+            }
+        }
+        if (file == null)
+        {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("java -jar full-stack-tester-{VERSION}-jar-with-dependencies.jar", options, true);
+            return;
         }
         if (parse.hasOption(DUMP_IMAGES_PARAM))
         {
@@ -187,17 +203,20 @@ public class Tester
         Option baseUrl = new Option(URL_PARAM, true, "base url of deployed ARender");
         baseUrl.setRequired(true);
         Option folderName = new Option(FOLDER_PATH_PARAM, true, "path containing all documents to test in ARender");
-        folderName.setRequired(true);
+        folderName.setRequired(false);
         Option dumpWhiteImages = new Option(DUMP_IMAGES_PARAM, false, "Dump all white images into a specific folder");
         dumpWhiteImages.setRequired(false);
-        Option fullRun = new Option(FULL_RUN_PARAM, false, "Asks for a full run instead of 2mn load");
+        Option fullRun = new Option(FULL_RUN_PARAM, false, "Asks for a full run instead of 120mn load");
         fullRun.setRequired(false);
+        Option filelist = new Option(FILE_LIST_PATH_PARAM, true, "Run with a predefined list of parameters");
+        filelist.setRequired(false);
 
         Options options = new Options();
         options.addOption(baseUrl);
         options.addOption(folderName);
         options.addOption(dumpWhiteImages);
         options.addOption(fullRun);
+        options.addOption(filelist);
         return options;
     }
 
